@@ -3,7 +3,15 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import QByteArray, QItemSelectionModel, QPoint, Qt, QTimer, QUrl
+from PySide6.QtCore import (
+    QByteArray,
+    QFileSystemWatcher,
+    QItemSelectionModel,
+    QPoint,
+    Qt,
+    QTimer,
+    QUrl,
+)
 from PySide6.QtGui import QCloseEvent, QDesktopServices, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -27,6 +35,7 @@ from vault_launcher.obsidian_config import read_obsidian_vaults
 from vault_launcher.settings import Settings, save_settings
 from vault_launcher.store import Vault, VaultStore, sort_vaults
 from vault_launcher.ui.settings_dialog import SettingsDialog
+from vault_launcher.ui.sync_dialog import SyncDialog
 from vault_launcher.ui.vault_list import VaultDelegate, VaultListModel, VaultRole
 
 log = logging.getLogger(__name__)
@@ -34,6 +43,9 @@ log = logging.getLogger(__name__)
 # Icon names under which Obsidian installs its icon (native packages, flatpak).
 OBSIDIAN_ICON_NAMES = ("obsidian", "md.obsidian.Obsidian")
 LOGO_SIZE = 72
+
+# Obsidian rewrites obsidian.json in several steps; wait for it to settle.
+SYNC_DEBOUNCE_MS = 500
 
 # Give the desktop a moment to receive the URI (D-Bus / portal) before quitting.
 QUIT_DELAY_MS = 300
@@ -53,6 +65,15 @@ class MainWindow(QWidget):
         self.settings_path = settings_path
         self.obsidian_config_files = obsidian_config_files
         self.colors = theme.resolve(settings.theme)
+        # Missing vaults the user postponed with "Ask later" in this session.
+        self._postponed_missing: set[str] = set()
+        self._sync_dialog_open = False
+
+        self._watcher = QFileSystemWatcher(self)
+        self._sync_timer = QTimer(self, singleShot=True, interval=SYNC_DEBOUNCE_MS)
+        self._sync_timer.timeout.connect(self.sync_from_obsidian)
+        self._watcher.fileChanged.connect(lambda _: self._sync_timer.start())
+        self._watcher.directoryChanged.connect(lambda _: self._sync_timer.start())
 
         self.setWindowTitle(APP_NAME)
         self.resize(640, 420)
@@ -195,14 +216,53 @@ class MainWindow(QWidget):
         self.list.setFocus()
 
     def sync_from_obsidian(self) -> None:
+        self._update_watcher()
         vaults = read_obsidian_vaults(self.obsidian_config_files())
         if vaults is None:
             log.info("no readable obsidian.json found, skipping sync")
-        else:
-            result = self.store.sync(vaults)
-            if result.changed:
-                self._save_store()
+            self.refresh()
+            return
+        result = self.store.sync(vaults)
+        if result.changed:
+            log.info("synced: %d added, %d updated", len(result.added), len(result.updated))
+            self._save_store()
         self.refresh()
+        self._ask_about_missing([v for v in result.missing
+                                 if v.key not in self._postponed_missing])
+
+    def _update_watcher(self) -> None:
+        """Watch the config files and their folders.
+
+        Obsidian replaces obsidian.json on save, which drops a file watch, and the
+        file may not exist yet; the folder watch covers both cases.
+        """
+        wanted = set()
+        for path in self.obsidian_config_files():
+            if path.is_file():
+                wanted.add(str(path))
+            if path.parent.is_dir():
+                wanted.add(str(path.parent))
+        current = set(self._watcher.files() + self._watcher.directories())
+        if current - wanted:
+            self._watcher.removePaths(list(current - wanted))
+        if wanted - current:
+            self._watcher.addPaths(list(wanted - current))
+
+    def _ask_about_missing(self, missing: list[Vault]) -> None:
+        if not missing or self._sync_dialog_open or not self.isVisible():
+            return
+        self._sync_dialog_open = True
+        try:
+            dialog = SyncDialog(missing, self)
+            if dialog.exec() == SyncDialog.DialogCode.Accepted:
+                keep, remove = dialog.decision()
+                self.store.resolve_missing(keep, remove)
+                self._save_store()
+                self.refresh()
+            else:
+                self._postponed_missing.update(v.key for v in missing)
+        finally:
+            self._sync_dialog_open = False
 
     # Actions
 

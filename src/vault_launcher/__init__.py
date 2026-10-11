@@ -1,3 +1,6 @@
 APP_ID = "io.github.manihindrich.VaultLauncher"
 APP_NAME = "Vault Launcher"
+AUTHOR = "Mani Hindrich"
+AUTHOR_EMAIL = "mani@hindrich.cz"
+AUTHOR_URL = "https://github.com/manihindrich"
 __version__ = "0.1.0"

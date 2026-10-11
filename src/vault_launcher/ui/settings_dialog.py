@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from vault_launcher import APP_NAME, AUTHOR, AUTHOR_EMAIL, AUTHOR_URL, __version__
 from vault_launcher.settings import THEME_DARK, THEME_LIGHT, THEME_SYSTEM, Settings
 from vault_launcher.store import SORT_LABEL, SORT_NAME, SORT_RECENT, VaultStore
 from vault_launcher.ui.vault_list import display_path
@@ -103,6 +104,21 @@ class SettingsDialog(QDialog):
         )
         badges.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(badges)
+
+        layout.addSpacing(8)
+        layout.addWidget(QLabel(self.tr("About"), objectName="actionTitle"))
+        github = AUTHOR_URL.removeprefix("https://")
+        about = QLabel(
+            f"{APP_NAME} {__version__} · "
+            + self.tr("made by {}").format(AUTHOR)
+            + f"<br><a href='mailto:{AUTHOR_EMAIL}'>{AUTHOR_EMAIL}</a>"
+            + f" · <a href='{AUTHOR_URL}'>{github}</a>",
+            objectName="help",
+            wordWrap=True,
+        )
+        about.setTextFormat(Qt.TextFormat.RichText)
+        about.setOpenExternalLinks(True)
+        layout.addWidget(about)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         buttons.rejected.connect(self.reject)

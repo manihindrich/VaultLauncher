@@ -211,14 +211,14 @@ def stylesheet(c: ThemeColors) -> str:
         spacing: 8px;
         background: transparent;
     }}
-    QCheckBox::indicator {{
+    QCheckBox::indicator, QListWidget::indicator {{
         width: 14px;
         height: 14px;
         border: 1px solid {c.text_faint};
         border-radius: 4px;
         background: {c.interactive_normal};
     }}
-    QCheckBox::indicator:checked {{
+    QCheckBox::indicator:checked, QListWidget::indicator:checked {{
         border: 1px solid {c.accent};
         background: {c.accent};
     }}
