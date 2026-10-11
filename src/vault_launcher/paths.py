@@ -41,6 +41,32 @@ def obsidian_config_candidates(
     ]
 
 
+def icon_search_dirs(env: Mapping[str, str] = os.environ, home: Path | None = None) -> list[Path]:
+    """Icon theme directories per XDG, plus NixOS profiles and flatpak exports.
+
+    Qt only searches these itself when a desktop platform theme plugin is loaded.
+    """
+    home = home or Path.home()
+    data_dirs = [_xdg_dir(env, "XDG_DATA_HOME", home, ".local/share")]
+    data_dirs += [Path(d) for d in env.get("XDG_DATA_DIRS", "").split(":") if os.path.isabs(d)]
+    user = env.get("USER", "")
+    data_dirs += [
+        Path("/usr/local/share"),
+        Path("/usr/share"),
+        home / ".nix-profile/share",
+        Path(f"/etc/profiles/per-user/{user}/share") if user else None,
+        Path("/run/current-system/sw/share"),
+        home / ".local/share/flatpak/exports/share",
+        Path("/var/lib/flatpak/exports/share"),
+        Path("/run/host/usr/share"),  # host /usr inside a flatpak sandbox
+    ]
+    result: list[Path] = [home / ".icons"]
+    for d in data_dirs:
+        if d is not None and (d / "icons") not in result:
+            result.append(d / "icons")
+    return result
+
+
 def app_config_dir(env: Mapping[str, str] = os.environ, home: Path | None = None) -> Path:
     home = home or Path.home()
     return _xdg_dir(env, "XDG_CONFIG_HOME", home, ".config") / APP_DIR_NAME

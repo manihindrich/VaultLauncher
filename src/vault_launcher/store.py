@@ -46,6 +46,7 @@ class Vault:
     in_obsidian: bool = False
     obsidian_ts: int = 0
     last_opened: int = 0
+    hidden: bool = False
 
     @property
     def name(self) -> str:
@@ -100,6 +101,14 @@ class VaultStore:
     def vaults(self) -> list[Vault]:
         return list(self._vaults.values())
 
+    @property
+    def visible_vaults(self) -> list[Vault]:
+        return [v for v in self._vaults.values() if not v.hidden]
+
+    @property
+    def hidden_vaults(self) -> list[Vault]:
+        return [v for v in self._vaults.values() if v.hidden]
+
     def get(self, key: str) -> Vault | None:
         return self._vaults.get(key)
 
@@ -139,6 +148,7 @@ class VaultStore:
         """Add a folder by hand; returns the existing entry if the path is already known."""
         existing = self.find_by_path(path)
         if existing:
+            existing.hidden = False
             return existing
         norm = normalize_path(path)
         vault = Vault(key=manual_key(norm), path=norm, source=SOURCE_MANUAL)
@@ -146,7 +156,21 @@ class VaultStore:
         return vault
 
     def remove(self, key: str) -> None:
-        self._vaults.pop(key, None)
+        """Remove a vault from the launcher.
+
+        Vaults Obsidian knows about are only hidden, otherwise the next sync
+        would bring them back.
+        """
+        vault = self._vaults.get(key)
+        if vault is None:
+            return
+        if vault.in_obsidian:
+            vault.hidden = True
+        else:
+            del self._vaults[key]
+
+    def unhide(self, key: str) -> None:
+        self._vaults[key].hidden = False
 
     def set_label(self, key: str, label: str | None) -> None:
         vault = self._vaults[key]
@@ -197,9 +221,15 @@ class VaultStore:
                     result.updated.append(vault)
             seen_keys.add(vault.key)
 
-        result.missing = [
-            v for v in self._vaults.values() if v.in_obsidian and v.key not in seen_keys
-        ]
+        for vault in self._vaults.values():
+            if not vault.in_obsidian or vault.key in seen_keys:
+                continue
+            if vault.hidden:
+                # Nothing to ask about: the user already removed it from the launcher.
+                vault.in_obsidian = False
+                result.updated.append(vault)
+            else:
+                result.missing.append(vault)
         return result
 
     def resolve_missing(self, keep: Iterable[str], remove: Iterable[str]) -> None:

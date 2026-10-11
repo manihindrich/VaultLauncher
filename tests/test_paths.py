@@ -34,3 +34,12 @@ def test_flatpak_reads_host_config():
     assert paths.obsidian_config_candidates(env, HOME)[0] == Path("/host/cfg/obsidian/obsidian.json")
     # The app's own files stay inside the sandbox.
     assert paths.settings_file(env, HOME).is_relative_to(HOME / ".var/app")
+
+
+def test_icon_search_dirs():
+    env = {"XDG_DATA_DIRS": "/a/share:relative:/usr/share", "USER": "me"}
+    dirs = paths.icon_search_dirs(env, HOME)
+    assert dirs[:3] == [HOME / ".icons", HOME / ".local/share/icons", Path("/a/share/icons")]
+    assert Path("/etc/profiles/per-user/me/share/icons") in dirs
+    assert Path("/run/current-system/sw/share/icons") in dirs
+    assert len(dirs) == len(set(dirs))
