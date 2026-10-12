@@ -1,69 +1,148 @@
 # Vault Launcher
 
-Small launcher window for [Obsidian](https://obsidian.md) vaults: pick a vault, it opens in
-Obsidian, the launcher closes (or stays, if you prefer). Not affiliated with Obsidian.
+**Choose which Obsidian vault to open, before Obsidian starts.**
+
+Vault Launcher is a small window for Linux that lists your [Obsidian](https://obsidian.md)
+vaults. Pick one and it opens in Obsidian. The launcher then gets out of the way.
 
 ![Vault Launcher main window](data/screenshots/main.png)
 
-- Reads the vault list from Obsidian's `obsidian.json` (native, flatpak and snap installs) and
-  keeps it in sync while the window is open. Vaults removed from Obsidian are not dropped
-  silently, you decide whether to keep them.
-- Add folders by hand, give vaults your own labels, hide vaults you do not need.
-- Sort by last use, folder name or label.
-- Light / dark / system theme modelled on Obsidian's default theme.
-- Vaults are opened through `obsidian://open?vault=<id>`. Obsidian cannot open a folder it
-  does not know through a link, so a folder added by hand is added to Obsidian's
-  `obsidian.json` the first time you open it, the same way Obsidian's "Open folder as vault"
-  does. Obsidian reads that file only at startup, so the launcher asks you to close Obsidian
-  first and keeps the previous version as `obsidian.json.bak`. Nothing else in Obsidian's
-  files or in your vaults is changed.
+## Why
 
-## Usage
+Obsidian always reopens the vault you used last. If you keep several vaults, for example
+work notes, a personal journal and a project wiki, you first land in the wrong one and then
+have to go through the vault switcher.
 
-| Action | |
-|---|---|
-| Double-click, Enter | open the vault |
-| Right-click | menu: open, edit label, show folder, hide |
-| ↑ / ↓, typing letters | select a vault |
-| F2 | edit label |
-| Delete | hide the vault (restore it in settings) |
-| Ctrl+O | add folder as vault |
-| Ctrl+, | settings and help |
-| Esc | close |
+Vault Launcher fixes the order: **start the launcher instead of Obsidian, pick a vault,
+done.** It works like Obsidian's own vault chooser, but it is a normal application. You can
+put it in your app menu, on a panel, on a keyboard shortcut or on the desktop.
+
+It is handy if you:
+
+- switch between several vaults during the day,
+- keep vaults on other drives or in folders outside your home (`/data/…`, a NAS mount, …),
+- want readable names for vaults whose folders are called `notes-2024-v2`,
+- want to start Obsidian straight into the right vault from a launcher such as KRunner.
+
+## Features
+
+- **Finds your vaults automatically.** It reads the vault list from Obsidian (regular,
+  flatpak and snap installs) and stays in sync while it is open. If a vault disappears from
+  Obsidian, the launcher asks you whether to keep it or drop it.
+- **Add any folder** as a vault, including folders Obsidian does not know yet.
+- **Your own labels.** Show "Work" instead of `company-kb-final`. The folder is not renamed.
+- **Hide** vaults you do not need in the list. You can restore them at any time in Settings.
+- **Sort** by last use, by folder name or by label.
+- **Looks like Obsidian.** It has a light, dark or "follow the system" theme.
+- **Closes after opening a vault**, or stays open if you prefer.
+- **Works from the keyboard.** Arrows, typing to search, Enter to open.
 
 ![Settings with help](data/screenshots/settings.png)
 
-Data is stored in `~/.local/share/vault-launcher/vaults.json`, settings in
-`~/.config/vault-launcher/settings.json` (inside `~/.var/app/io.github.manihindrich.VaultLauncher/`
-when running as a flatpak).
+## Installation
 
-## Install
+You need Obsidian installed: the regular package, the Obsidian flatpak or the snap.
 
-### Nix / NixOS
+### Flatpak (any Linux distribution)
+
+1. Download `vault-launcher.flatpak` from the
+   [latest release](https://github.com/manihindrich/VaultLauncher/releases/latest).
+2. Install it:
+
+   ```sh
+   flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+   flatpak install --user vault-launcher.flatpak
+   ```
+
+   The first command adds Flathub, if you do not have it yet. The launcher needs the KDE
+   runtime from there.
+3. Start **Vault Launcher** from your application menu, or run
+   `flatpak run io.github.manihindrich.VaultLauncher`.
+
+To update, download the new `vault-launcher.flatpak` and install it again the same way.
+
+> If the launcher does not show up in the menu right after installing flatpak for the first
+> time, log out and back in.
+
+### NixOS / Nix
+
+Try it without installing:
 
 ```sh
 nix run github:manihindrich/VaultLauncher
 ```
 
-In a NixOS or home-manager configuration, add the flake as an input and use
-`inputs.vault-launcher.packages.${pkgs.system}.default` (or the `overlays.default` overlay,
-which provides `pkgs.vault-launcher`). The package is defined in `nix/package.nix`.
+To install it permanently, add the flake to your NixOS or home-manager configuration:
+
+```nix
+# flake.nix
+inputs.vault-launcher.url = "github:manihindrich/VaultLauncher";
+
+# configuration.nix or home.nix
+environment.systemPackages = [ inputs.vault-launcher.packages.${pkgs.system}.default ];
+# or: home.packages = [ … ];
+```
+
+There is also an overlay, `inputs.vault-launcher.overlays.default`, which adds
+`pkgs.vault-launcher`.
+
+## Using it
+
+| | |
+|---|---|
+| **Double-click** or **Enter** | open the vault |
+| **Right-click** | menu: open, edit label, show folder in file manager, hide |
+| **↑ / ↓**, **typing letters** | select a vault |
+| **F2** | edit the label |
+| **Delete** | hide the vault (restore it in Settings) |
+| **Ctrl+O** | add a folder as a vault |
+| **Ctrl+,** | settings and help |
+| **Esc** | close |
+
+Badges in the list:
+
+- **not in Obsidian**: Obsidian does not know this folder yet. See the next section.
+- **folder missing**: the folder no longer exists, for example because a drive is not
+  mounted.
+
+### Folders Obsidian does not know yet
+
+Obsidian can only open folders that are in its own list of vaults. When you open a folder
+like that for the first time, the launcher adds it to that list, just as Obsidian's "Open
+folder as vault" would.
+
+Obsidian reads the list only when it starts, so **Obsidian has to be closed** for this one
+step. If it is running, the launcher asks you to close it and click Retry. After that, the
+vault opens normally, whether Obsidian is running or not.
+
+## What it touches
+
+- **Your vaults:** only reads them. Obsidian creates its `.obsidian` folder in a new vault, as
+  usual.
+- **Obsidian's settings:** only reads them, except when adding a folder Obsidian does not
+  know yet (see above). In that case it adds one entry to Obsidian's `obsidian.json` and keeps
+  the previous version as `obsidian.json.bak`.
+- **Its own data:** labels and hidden vaults are in
+  `~/.local/share/vault-launcher/vaults.json`, settings in
+  `~/.config/vault-launcher/settings.json`. For the flatpak, both are under
+  `~/.var/app/io.github.manihindrich.VaultLauncher/`.
+- **No network access.** The flatpak can read the file system, so that vaults outside your
+  home folder work, and can write only to Obsidian's configuration folder.
+
+## Building it yourself
 
 ### Flatpak
 
-The manifest is in `flatpak/`. It needs `flatpak` and `flatpak-builder` with the Flathub
-remote (on NixOS: `services.flatpak.enable = true;`). `flatpak-builder` also calls
-`appstreamcli` on the host; on NixOS run the commands below inside
-`nix shell nixpkgs#appstream` if it is not installed.
+You need `flatpak`, `flatpak-builder` and the Flathub remote. On NixOS that means
+`services.flatpak.enable = true;`. `flatpak-builder` also needs `appstreamcli`. On NixOS you
+can get it temporarily with `nix shell nixpkgs#appstream`.
 
 ```sh
-flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 flatpak-builder --user --install --install-deps-from=flathub --force-clean \
     build-dir flatpak/io.github.manihindrich.VaultLauncher.yml
-flatpak run io.github.manihindrich.VaultLauncher
 ```
 
-To produce a single-file bundle for distribution:
+Single-file bundle, as published in the releases:
 
 ```sh
 flatpak-builder --repo=repo --force-clean build-dir flatpak/io.github.manihindrich.VaultLauncher.yml
@@ -71,11 +150,7 @@ flatpak build-bundle repo vault-launcher.flatpak io.github.manihindrich.VaultLau
     --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
 ```
 
-The flatpak has read-only access to the whole file system (`--filesystem=host:ro`) so that
-vaults outside your home folder work too, and write access only to Obsidian's configuration
-folder.
-
-## Development
+### Development
 
 ```sh
 nix develop
@@ -88,5 +163,7 @@ appstreamcli validate --no-net data/*.metainfo.xml
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Author: Mani Hindrich, <mani@hindrich.cz>,
-[github.com/manihindrich](https://github.com/manihindrich).
+MIT, see [LICENSE](LICENSE).
+Made by Mani Hindrich, <mani@hindrich.cz>, [github.com/manihindrich](https://github.com/manihindrich).
+
+Vault Launcher is an independent project and is not affiliated with Obsidian.
