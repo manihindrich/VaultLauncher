@@ -7,8 +7,9 @@ def build_uri(vault: Vault) -> str:
     """Obsidian URI that opens the vault.
 
     Vaults known to Obsidian are opened by id, which stays unambiguous even when
-    two vaults share a folder name. Other folders are opened by path, and
-    Obsidian registers them in obsidian.json on first open.
+    two vaults share a folder name. Obsidian resolves a path only to a vault it
+    already knows that contains the path, so other folders have to be registered
+    first (obsidian_config.register_vault).
     """
     if vault.in_obsidian and vault.obsidian_id:
         return "obsidian://open?vault=" + quote(vault.obsidian_id, safe="")

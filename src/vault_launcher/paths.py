@@ -1,5 +1,5 @@
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
 APP_DIR_NAME = "vault-launcher"
@@ -65,6 +65,43 @@ def icon_search_dirs(env: Mapping[str, str] = os.environ, home: Path | None = No
         if d is not None and (d / "icons") not in result:
             result.append(d / "icons")
     return result
+
+
+HOST_PATH_XATTR = "user.document-portal.host-path"
+
+
+def _document_portal_roots(env: Mapping[str, str]) -> list[str]:
+    roots = ["/run/flatpak/doc"]
+    runtime_dir = env.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+    roots.append(os.path.join(runtime_dir, "doc"))
+    return roots
+
+
+def is_document_portal_path(path: str, env: Mapping[str, str] = os.environ) -> bool:
+    return any(path == r or path.startswith(r + "/") for r in _document_portal_roots(env))
+
+
+def host_path(
+    path: str,
+    env: Mapping[str, str] = os.environ,
+    getxattr: Callable[[str, str], bytes] = os.getxattr,
+) -> str | None:
+    """The real path of a folder returned by a file chooser.
+
+    Inside a flatpak the file chooser portal can hand out a document portal path
+    (/run/user/<uid>/doc/<id>/<name>) that only this sandbox understands. The
+    document portal exposes the original location as an extended attribute.
+    Returns None if the real path cannot be determined.
+    """
+    if not is_document_portal_path(path, env):
+        return path
+    try:
+        value = getxattr(path, HOST_PATH_XATTR).rstrip(b"\0").decode()
+    except (OSError, UnicodeDecodeError):
+        return None
+    if os.path.isabs(value) and not is_document_portal_path(value, env):
+        return value
+    return None
 
 
 def app_config_dir(env: Mapping[str, str] = os.environ, home: Path | None = None) -> Path:

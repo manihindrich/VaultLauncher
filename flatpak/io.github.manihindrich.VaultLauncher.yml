@@ -1,0 +1,44 @@
+id: io.github.manihindrich.VaultLauncher
+runtime: org.kde.Platform
+runtime-version: '6.11'
+sdk: org.kde.Sdk
+base: io.qt.PySide.BaseApp
+base-version: '6.11'
+command: vault-launcher
+cleanup-commands:
+  - /app/cleanup-BaseApp.sh
+
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # Read-only: check that vault folders exist and get real paths from the folder picker.
+  # Vaults can live anywhere (e.g. /data/vault), so home access alone is not enough.
+  - --filesystem=host:ro
+  # Obsidian's vault list, native install and the Obsidian flatpak. Writable so that
+  # folders Obsidian does not know yet can be added to it (only while Obsidian is closed).
+  - --filesystem=xdg-config/obsidian
+  - --filesystem=~/.var/app/md.obsidian.Obsidian/config/obsidian
+  # NixOS system icons, so the window can show Obsidian's own logo.
+  - --filesystem=/run/current-system/sw/share/icons:ro
+
+modules:
+  - name: vault-launcher
+    buildsystem: simple
+    build-commands:
+      - install -d /app/share/vault-launcher
+      - cp -r src/vault_launcher /app/share/vault-launcher/
+      - install -Dm755 flatpak/vault-launcher.sh /app/bin/vault-launcher
+      - install -Dm644 data/${FLATPAK_ID}.desktop /app/share/applications/${FLATPAK_ID}.desktop
+      - install -Dm644 data/${FLATPAK_ID}.metainfo.xml /app/share/metainfo/${FLATPAK_ID}.metainfo.xml
+      - install -Dm644 src/vault_launcher/resources/app-icon.svg /app/share/icons/hicolor/scalable/apps/${FLATPAK_ID}.svg
+    sources:
+      - type: dir
+        path: ..
+        skip:
+          - .git
+          - .flatpak-builder
+          - build-dir
+          - repo
+          - result

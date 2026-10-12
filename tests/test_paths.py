@@ -43,3 +43,33 @@ def test_icon_search_dirs():
     assert Path("/etc/profiles/per-user/me/share/icons") in dirs
     assert Path("/run/current-system/sw/share/icons") in dirs
     assert len(dirs) == len(set(dirs))
+
+
+RUNTIME_ENV = {"XDG_RUNTIME_DIR": "/run/user/1000"}
+
+
+def _xattr(value: bytes | None):
+    def getxattr(path, name):
+        assert name == paths.HOST_PATH_XATTR
+        if value is None:
+            raise OSError(61, "No data available")
+        return value
+    return getxattr
+
+
+def test_host_path_plain_path_unchanged():
+    assert paths.host_path("/data/vault/PKM", RUNTIME_ENV, _xattr(None)) == "/data/vault/PKM"
+    assert paths.host_path("/run/user/1000/docs", RUNTIME_ENV, _xattr(None)) == "/run/user/1000/docs"
+
+
+def test_host_path_document_portal():
+    doc = "/run/user/1000/doc/4ae7d9f5/My Vault"
+    assert paths.host_path(doc, RUNTIME_ENV, _xattr(b"/data/vault/My Vault\0")) == "/data/vault/My Vault"
+    assert paths.host_path("/run/flatpak/doc/1/x", RUNTIME_ENV, _xattr(b"/data/x")) == "/data/x"
+
+
+def test_host_path_unresolvable():
+    doc = "/run/user/1000/doc/4ae7d9f5/obs_temp"
+    assert paths.host_path(doc, RUNTIME_ENV, _xattr(None)) is None
+    assert paths.host_path(doc, RUNTIME_ENV, _xattr(b"relative")) is None
+    assert paths.host_path(doc, RUNTIME_ENV, _xattr(b"/run/user/1000/doc/1/y")) is None

@@ -26,8 +26,15 @@ def read_json(path: Path) -> Any:
 def write_json_atomic(path: Path, data: Any) -> None:
     """Write JSON so that readers never see a half-written file."""
     path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        mode = path.stat().st_mode & 0o777
+    except FileNotFoundError:
+        mode = None
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
     try:
+        if mode is not None:
+            # mkstemp creates the file as 0600; keep the permissions of the file we replace.
+            os.fchmod(fd, mode)
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
             f.write("\n")

@@ -1,5 +1,6 @@
 import locale
 import logging
+import signal
 import sys
 
 from PySide6.QtGui import QFont, QGuiApplication, QIcon
@@ -8,7 +9,7 @@ from PySide6.QtWidgets import QApplication
 from vault_launcher import APP_ID, APP_NAME, __version__, paths
 from vault_launcher.settings import THEME_SYSTEM, load_settings
 from vault_launcher.store import VaultStore
-from vault_launcher.ui.main_window import MainWindow, obsidian_icon
+from vault_launcher.ui.main_window import MainWindow, app_logo
 
 
 def main() -> int:
@@ -18,6 +19,8 @@ def main() -> int:
     except locale.Error:
         pass
 
+    # Ctrl+C in a terminal: quit right away instead of a traceback from the Qt loop.
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setApplicationVersion(__version__)
@@ -30,9 +33,7 @@ def main() -> int:
         QIcon.setThemeName("hicolor")
     QIcon.setFallbackThemeName("hicolor")
 
-    icon = obsidian_icon()
-    if icon:
-        app.setWindowIcon(icon)
+    app.setWindowIcon(app_logo())
 
     font = QFont(app.font())
     font.setFamilies(["Inter", app.font().family()])

@@ -9,3 +9,5 @@ result
 result-*
 .flatpak-builder/
 build-dir/
+repo/
+*.flatpak

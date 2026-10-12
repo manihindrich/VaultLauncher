@@ -29,9 +29,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from vault_launcher import APP_NAME, __version__, theme
+from vault_launcher import APP_ID, APP_NAME, __version__, paths, theme
 from vault_launcher.launcher import build_uri, open_uri
-from vault_launcher.obsidian_config import read_obsidian_vaults
+from vault_launcher.jsonfile import JsonFileError
+from vault_launcher.obsidian_config import (
+    obsidian_running,
+    pid_alive,
+    read_obsidian_vaults,
+    register_vault,
+)
 from vault_launcher.settings import Settings, save_settings
 from vault_launcher.store import Vault, VaultStore, sort_vaults
 from vault_launcher.ui.settings_dialog import SettingsDialog
@@ -43,6 +49,7 @@ log = logging.getLogger(__name__)
 # Icon names under which Obsidian installs its icon (native packages, flatpak).
 OBSIDIAN_ICON_NAMES = ("obsidian", "md.obsidian.Obsidian")
 LOGO_SIZE = 72
+BUNDLED_ICON = Path(__file__).resolve().parent.parent / "resources" / "app-icon.svg"
 
 # Obsidian rewrites obsidian.json in several steps; wait for it to settle.
 SYNC_DEBOUNCE_MS = 500
@@ -127,11 +134,9 @@ class MainWindow(QWidget):
         main_layout.addStretch(2)
 
         logo = QLabel(alignment=Qt.AlignmentFlag.AlignCenter)
-        icon = obsidian_icon()
-        if icon:
-            logo.setPixmap(icon.pixmap(LOGO_SIZE, LOGO_SIZE))
-            main_layout.addWidget(logo)
-            main_layout.addSpacing(8)
+        logo.setPixmap(app_logo().pixmap(LOGO_SIZE, LOGO_SIZE))
+        main_layout.addWidget(logo)
+        main_layout.addSpacing(8)
 
         name = QLabel(APP_NAME, objectName="appName", alignment=Qt.AlignmentFlag.AlignCenter)
         version = QLabel(
@@ -272,6 +277,8 @@ class MainWindow(QWidget):
             self.open_vault(vault)
 
     def open_vault(self, vault: Vault) -> None:
+        if not (vault.in_obsidian and vault.obsidian_id) and not self._register_in_obsidian(vault):
+            return
         uri = build_uri(vault)
         log.info("opening %s", uri)
         if not open_uri(uri):
@@ -291,11 +298,70 @@ class MainWindow(QWidget):
         else:
             self.refresh()
 
+    def _register_in_obsidian(self, vault: Vault) -> bool:
+        """Add a folder Obsidian does not know yet to its vault list.
+
+        Obsidian cannot open such a folder through a link, and it reads obsidian.json
+        only at startup, so this waits until Obsidian is closed.
+        """
+        config = next((p for p in self.obsidian_config_files() if p.is_file()), None)
+        if config is None:
+            QMessageBox.warning(
+                self, APP_NAME,
+                self.tr("Obsidian's list of vaults (obsidian.json) was not found. "
+                        "Start Obsidian once, then try again."),
+            )
+            return False
+        # Inside the flatpak the host's processes are not visible, only Obsidian's lock.
+        alive = None if paths.is_flatpak() else pid_alive
+        while obsidian_running(config.parent, alive):
+            text = self.tr(
+                "Obsidian does not know “{}” yet. It reads its list of vaults only when it "
+                "starts, so the folder can be added to the list only while Obsidian is "
+                "closed.\n\nClose all Obsidian windows and click Retry."
+            ).format(vault.display_name)
+            if alive is None:
+                text += "\n\n" + self.tr(
+                    "If Obsidian is not running, it did not quit properly last time. "
+                    "Start it and quit it once.")
+            box = QMessageBox(QMessageBox.Icon.Information, APP_NAME, text, parent=self)
+            retry = box.addButton(self.tr("Retry"), QMessageBox.ButtonRole.AcceptRole)
+            box.addButton(QMessageBox.StandardButton.Cancel)
+            box.setDefaultButton(retry)
+            box.exec()
+            if box.clickedButton() is not retry:
+                return False
+        try:
+            register_vault(config, vault.path)
+        except (OSError, JsonFileError) as e:
+            log.error("cannot register %s: %s", vault.path, e)
+            QMessageBox.warning(
+                self, APP_NAME,
+                self.tr("Could not add the folder to Obsidian's list of vaults:\n{}").format(e),
+            )
+            return False
+        # Merges the folder with the new Obsidian entry, which gives it an Obsidian id.
+        self.sync_from_obsidian()
+        return vault.in_obsidian and vault.obsidian_id is not None
+
     def add_folder(self) -> None:
-        path = QFileDialog.getExistingDirectory(self, self.tr("Add folder as vault"),
-                                                os.path.expanduser("~"))
+        title = self.tr("Add folder as vault")
+        path = QFileDialog.getExistingDirectory(self, title, os.path.expanduser("~"))
         if not path:
             return
+        real_path = paths.host_path(path)
+        if real_path is None:
+            # The portal gave a sandbox-only path and did not say where the folder really
+            # is. Qt's own dialog browses the (read-only) host file system directly.
+            log.info("cannot resolve %s, asking again without the portal", path)
+            path = QFileDialog.getExistingDirectory(
+                self, title, os.path.expanduser("~"),
+                QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontUseNativeDialog,
+            )
+            if not path:
+                return
+            real_path = path
+        path = real_path
         if not os.path.isdir(os.path.join(path, ".obsidian")):
             answer = QMessageBox.question(
                 self,
@@ -415,9 +481,10 @@ class MainWindow(QWidget):
         super().closeEvent(event)
 
 
-def obsidian_icon() -> QIcon | None:
+def app_logo() -> QIcon:
+    """Obsidian's icon from the system icon theme, or the launcher's own icon."""
     for name in OBSIDIAN_ICON_NAMES:
         icon = QIcon.fromTheme(name)
         if not icon.isNull():
             return icon
-    return None
+    return QIcon.fromTheme(APP_ID, QIcon(str(BUNDLED_ICON)))

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Vault Launcher
+GenericName=Obsidian Vault Launcher
+Comment=Pick an Obsidian vault and open it
+Exec=vault-launcher
+Icon=io.github.manihindrich.VaultLauncher
+Terminal=false
+Categories=Utility;
+Keywords=obsidian;vault;notes;markdown;launcher;
+StartupNotify=true

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.manihindrich.VaultLauncher</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <name>Vault Launcher</name>
+  <summary>Pick an Obsidian vault and open it</summary>
+
+  <developer id="io.github.manihindrich">
+    <name>Mani Hindrich</name>
+  </developer>
+
+  <description>
+    <p>
+      A small window that lists your Obsidian vaults and opens the one you pick,
+      instead of whatever vault Obsidian opened last.
+    </p>
+    <ul>
+      <li>Vaults are read from Obsidian's own configuration and kept in sync while the window is open</li>
+      <li>Add folders by hand, give vaults your own labels, hide the ones you do not need</li>
+      <li>Sort by last use, folder name or label</li>
+      <li>Light, dark or system theme matching Obsidian's default look</li>
+      <li>Optionally closes itself after opening a vault</li>
+    </ul>
+    <p>Vault Launcher is not affiliated with Obsidian.</p>
+  </description>
+
+  <launchable type="desktop-id">io.github.manihindrich.VaultLauncher.desktop</launchable>
+  <provides>
+    <binary>vault-launcher</binary>
+  </provides>
+
+  <url type="homepage">https://github.com/manihindrich</url>
+
+  <content_rating type="oars-1.1"/>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#e4dafd</color>
+    <color type="primary" scheme_preference="dark">#3b2a6b</color>
+  </branding>
+
+  <releases>
+    <release version="0.1.0" date="2026-10-11">
+      <description>
+        <p>First release.</p>
+      </description>
+    </release>
+  </releases>
+</component>
