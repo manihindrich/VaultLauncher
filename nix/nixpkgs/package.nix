@@ -2,6 +2,7 @@
   lib,
   python3Packages,
   fetchFromGitHub,
+  nix-update-script,
   qt6,
 }:
 
@@ -49,6 +50,8 @@ python3Packages.buildPythonApplication (finalAttrs: {
   nativeCheckInputs = [ python3Packages.pytestCheckHook ];
 
   pythonImportsCheck = [ "vault_launcher" ];
+
+  passthru.updateScript = nix-update-script { };
 
   meta = {
     description = "Small window to pick an Obsidian vault and open it";

@@ -2,8 +2,9 @@
 
 **Choose which Obsidian vault to open, before Obsidian starts.**
 
-Vault Launcher is a small window for Linux that lists your [Obsidian](https://obsidian.md)
-vaults. Pick one and it opens in Obsidian. The launcher then gets out of the way.
+All your [Obsidian](https://obsidian.md) vaults in one clean list, a click away. Work notes,
+journal, that side-project wiki: jump straight into the one you need, not the one Obsidian
+happened to open last. Fast, keyboard-friendly, and it looks right at home next to Obsidian.
 
 ![Vault Launcher main window](data/screenshots/main.png)
 
