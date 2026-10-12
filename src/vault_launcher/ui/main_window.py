@@ -31,12 +31,14 @@ from PySide6.QtWidgets import (
 
 from vault_launcher import APP_ID, APP_NAME, __version__, paths, theme
 from vault_launcher.launcher import build_uri, open_uri
-from vault_launcher.jsonfile import JsonFileError
+from vault_launcher.jsonfile import JsonFileError, read_json
 from vault_launcher.obsidian_config import (
     obsidian_running,
+    parse_obsidian_config,
     pid_alive,
     read_obsidian_vaults,
     register_vault,
+    unregister_vault,
 )
 from vault_launcher.settings import Settings, save_settings
 from vault_launcher.store import Vault, VaultStore, sort_vaults
@@ -229,7 +231,8 @@ class MainWindow(QWidget):
             return
         result = self.store.sync(vaults)
         if result.changed:
-            log.info("synced: %d added, %d updated", len(result.added), len(result.updated))
+            log.info("synced: %d added, %d updated, %d removed",
+                     len(result.added), len(result.updated), len(result.removed))
             self._save_store()
         self.refresh()
         self._ask_about_missing([v for v in result.missing
@@ -312,25 +315,13 @@ class MainWindow(QWidget):
                         "Start Obsidian once, then try again."),
             )
             return False
-        # Inside the flatpak the host's processes are not visible, only Obsidian's lock.
-        alive = None if paths.is_flatpak() else pid_alive
-        while obsidian_running(config.parent, alive):
-            text = self.tr(
-                "Obsidian does not know “{}” yet. It reads its list of vaults only when it "
-                "starts, so the folder can be added to the list only while Obsidian is "
-                "closed.\n\nClose all Obsidian windows and click Retry."
-            ).format(vault.display_name)
-            if alive is None:
-                text += "\n\n" + self.tr(
-                    "If Obsidian is not running, it did not quit properly last time. "
-                    "Start it and quit it once.")
-            box = QMessageBox(QMessageBox.Icon.Information, APP_NAME, text, parent=self)
-            retry = box.addButton(self.tr("Retry"), QMessageBox.ButtonRole.AcceptRole)
-            box.addButton(QMessageBox.StandardButton.Cancel)
-            box.setDefaultButton(retry)
-            box.exec()
-            if box.clickedButton() is not retry:
-                return False
+        text = self.tr(
+            "Obsidian does not know “{}” yet. It reads its list of vaults only when it "
+            "starts, so the folder can be added to the list only while Obsidian is "
+            "closed."
+        ).format(vault.display_name)
+        if not self._wait_for_obsidian_closed(config, text):
+            return False
         try:
             register_vault(config, vault.path)
         except (OSError, JsonFileError) as e:
@@ -343,6 +334,76 @@ class MainWindow(QWidget):
         # Merges the folder with the new Obsidian entry, which gives it an Obsidian id.
         self.sync_from_obsidian()
         return vault.in_obsidian and vault.obsidian_id is not None
+
+    def _wait_for_obsidian_closed(self, config: Path, text: str) -> bool:
+        """Ask the user to close Obsidian until it is closed; False if they cancel.
+
+        Obsidian keeps obsidian.json in memory and overwrites it, so it may only be
+        edited while Obsidian is not running.
+        """
+        # Inside the flatpak the host's processes are not visible, only Obsidian's lock.
+        alive = None if paths.is_flatpak() else pid_alive
+        while obsidian_running(config.parent, alive):
+            message = text + "\n\n" + self.tr("Close all Obsidian windows and click Retry.")
+            if alive is None:
+                message += "\n\n" + self.tr(
+                    "If Obsidian is not running, it did not quit properly last time. "
+                    "Start it and quit it once.")
+            box = QMessageBox(QMessageBox.Icon.Information, APP_NAME, message, parent=self)
+            retry = box.addButton(self.tr("Retry"), QMessageBox.ButtonRole.AcceptRole)
+            box.addButton(QMessageBox.StandardButton.Cancel)
+            box.setDefaultButton(retry)
+            box.exec()
+            if box.clickedButton() is not retry:
+                return False
+        return True
+
+    def _config_with_vault(self, vault_id: str) -> Path | None:
+        """The obsidian.json that lists the vault."""
+        for path in self.obsidian_config_files():
+            try:
+                if any(v.id == vault_id for v in parse_obsidian_config(read_json(path))):
+                    return path
+            except (JsonFileError, ValueError):
+                continue
+        return None
+
+    def remove_from_obsidian(self, vault: Vault) -> None:
+        box = QMessageBox(
+            QMessageBox.Icon.Question,
+            self.tr("Remove from Obsidian"),
+            self.tr("Remove “{}” from Obsidian?\n\nObsidian will no longer list this vault "
+                    "and it disappears from the launcher too. The folder and your notes are "
+                    "not touched.").format(vault.display_name),
+            parent=self,
+        )
+        remove = box.addButton(self.tr("Remove"), QMessageBox.ButtonRole.DestructiveRole)
+        box.addButton(QMessageBox.StandardButton.Cancel)
+        box.setDefaultButton(QMessageBox.StandardButton.Cancel)
+        box.exec()
+        if box.clickedButton() is not remove:
+            return
+        config = self._config_with_vault(vault.obsidian_id) if vault.obsidian_id else None
+        if config is not None:
+            text = self.tr(
+                "Obsidian keeps its list of vaults in memory and would undo the change, so "
+                "“{}” can be removed from it only while Obsidian is closed."
+            ).format(vault.display_name)
+            if not self._wait_for_obsidian_closed(config, text):
+                return
+            try:
+                unregister_vault(config, vault.obsidian_id)
+            except (OSError, JsonFileError) as e:
+                log.error("cannot remove %s from Obsidian: %s", vault.obsidian_id, e)
+                QMessageBox.warning(
+                    self, APP_NAME,
+                    self.tr("Could not remove the vault from Obsidian's list of vaults:\n{}")
+                    .format(e),
+                )
+                return
+        self.store.forget(vault.key)
+        self._save_store()
+        self.sync_from_obsidian()
 
     def add_folder(self) -> None:
         title = self.tr("Add folder as vault")
@@ -426,6 +487,9 @@ class MainWindow(QWidget):
         show.setEnabled(os.path.isdir(vault.path))
         menu.addSeparator()
         menu.addAction(self.tr("Hide vault"), self.hide_selected)
+        if vault.in_obsidian and vault.obsidian_id:
+            menu.addAction(self.tr("Remove from Obsidian…"),
+                           lambda: self.remove_from_obsidian(vault))
         menu.exec(self.list.viewport().mapToGlobal(pos))
 
     def show_settings(self) -> None:

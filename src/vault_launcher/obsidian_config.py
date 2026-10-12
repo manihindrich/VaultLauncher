@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import secrets
 import shutil
 import socket
@@ -104,13 +105,8 @@ def obsidian_running(
     return pid_alive(int(pid))
 
 
-def register_vault(config_file: Path, path: str, now_ms: int | None = None) -> str:
-    """Add a folder to Obsidian's vault list the way Obsidian does, return its id.
-
-    Obsidian reads obsidian.json only at startup and later overwrites it with its
-    in-memory state, so this must only be called while Obsidian is not running.
-    Everything else in the file is kept; the previous version is saved as .bak.
-    """
+def _load_config(config_file: Path) -> tuple[dict, dict]:
+    """obsidian.json as (whole document, its "vaults" object) for editing."""
     data = read_json(config_file)
     if data is None:
         data = {}
@@ -119,6 +115,23 @@ def register_vault(config_file: Path, path: str, now_ms: int | None = None) -> s
     vaults = data.setdefault("vaults", {})
     if not isinstance(vaults, dict):
         raise JsonFileError(f"{config_file}: 'vaults' is not an object")
+    return data, vaults
+
+
+def _save_config(config_file: Path, data: dict) -> None:
+    if config_file.exists():
+        shutil.copy2(config_file, config_file.with_name(config_file.name + ".bak"))
+    write_json_atomic(config_file, data)
+
+
+def register_vault(config_file: Path, path: str, now_ms: int | None = None) -> str:
+    """Add a folder to Obsidian's vault list the way Obsidian does, return its id.
+
+    Obsidian reads obsidian.json only at startup and later overwrites it with its
+    in-memory state, so this must only be called while Obsidian is not running.
+    Everything else in the file is kept; the previous version is saved as .bak.
+    """
+    data, vaults = _load_config(config_file)
     path = os.path.abspath(path)
     for vault_id, entry in vaults.items():
         if isinstance(entry, dict) and entry.get("path") == path:
@@ -127,8 +140,25 @@ def register_vault(config_file: Path, path: str, now_ms: int | None = None) -> s
     while vault_id in vaults:
         vault_id = secrets.token_hex(8)
     vaults[vault_id] = {"path": path, "ts": now_ms if now_ms is not None else int(time.time() * 1000)}
-    if config_file.exists():
-        shutil.copy2(config_file, config_file.with_name(config_file.name + ".bak"))
-    write_json_atomic(config_file, data)
+    _save_config(config_file, data)
     log.info("registered %s in %s as %s", path, config_file, vault_id)
     return vault_id
+
+
+def unregister_vault(config_file: Path, vault_id: str) -> bool:
+    """Remove a vault from Obsidian's vault list the way Obsidian does.
+
+    Drops the entry from obsidian.json and the vault's window state file
+    (<id>.json next to it); the vault folder is not touched. Same rules as
+    register_vault(): only while Obsidian is not running, previous file kept as .bak.
+    Returns False when the id is not in the file.
+    """
+    data, vaults = _load_config(config_file)
+    if vault_id not in vaults:
+        return False
+    del vaults[vault_id]
+    _save_config(config_file, data)
+    if re.fullmatch(r"[0-9A-Za-z]+", vault_id):
+        (config_file.parent / f"{vault_id}.json").unlink(missing_ok=True)
+    log.info("removed vault %s from %s", vault_id, config_file)
+    return True

@@ -12,8 +12,10 @@ from vault_launcher.store import (
 )
 
 
-def make_store(tmp_path):
-    store = VaultStore(tmp_path / "vaults.json")
+def make_store(tmp_path, existing=None):
+    """Store whose folders all exist, or only those in `existing` when given."""
+    exists = (lambda p: True) if existing is None else (lambda p: p in existing)
+    store = VaultStore(tmp_path / "vaults.json", folder_exists=exists)
     store.load()
     return store
 
@@ -172,3 +174,46 @@ def test_adding_hidden_path_manually_unhides_it(tmp_path):
     store.hide("id1")
     assert store.add_manual("/v/a") is store.get("id1")
     assert not store.get("id1").hidden
+
+
+def test_vault_gone_from_obsidian_and_disk_is_removed_silently(tmp_path):
+    store = make_store(tmp_path, existing={"/v/a"})
+    store.sync([ObsidianVault("id1", "/v/a"), ObsidianVault("id2", "/v/b")])
+    result = store.sync([ObsidianVault("id1", "/v/a")])
+    assert [v.key for v in result.removed] == ["id2"]
+    assert result.missing == [] and result.changed
+    assert store.get("id2") is None and store.get("id1") is not None
+
+
+def test_vault_gone_from_obsidian_with_folder_is_still_asked_about(tmp_path):
+    store = make_store(tmp_path, existing={"/v/a", "/v/b"})
+    store.sync([ObsidianVault("id1", "/v/a"), ObsidianVault("id2", "/v/b")])
+    result = store.sync([ObsidianVault("id1", "/v/a")])
+    assert [v.key for v in result.missing] == ["id2"] and result.removed == []
+
+
+def test_manual_kept_and_hidden_vaults_without_folder_are_removed(tmp_path):
+    store = make_store(tmp_path, existing=set())
+    store.sync([ObsidianVault("id1", "/v/k"), ObsidianVault("id2", "/v/h")])
+    store.resolve_missing(keep=["id1", "id2"], remove=[])  # kept although Obsidian dropped them
+    store.hide("id2")
+    manual = store.add_manual("/v/m")
+    result = store.sync([])
+    assert sorted(v.key for v in result.removed) == sorted([manual.key, "id1", "id2"])
+    assert store.vaults == []
+
+
+def test_vault_in_obsidian_without_folder_stays(tmp_path):
+    # e.g. a drive that is not mounted right now
+    store = make_store(tmp_path, existing=set())
+    store.sync([ObsidianVault("id1", "/mnt/nas/notes")])
+    result = store.sync([ObsidianVault("id1", "/mnt/nas/notes")])
+    assert result.removed == [] and store.get("id1") is not None
+
+
+def test_forget(tmp_path):
+    store = make_store(tmp_path)
+    store.sync([ObsidianVault("id1", "/v/a")])
+    store.forget("id1")
+    store.forget("unknown")
+    assert store.vaults == []

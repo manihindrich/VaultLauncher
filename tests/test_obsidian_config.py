@@ -11,6 +11,7 @@ from vault_launcher.obsidian_config import (
     obsidian_running,
     read_obsidian_vaults,
     register_vault,
+    unregister_vault,
 )
 
 CONFIG = {
@@ -98,3 +99,40 @@ def test_obsidian_running(tmp_path):
     assert obsidian_running(tmp_path, lambda pid: False, hostname="other") is True
     # flatpak: processes of the host are not visible
     assert obsidian_running(tmp_path, None) is True
+
+
+def test_unregister_vault_removes_entry_and_window_state(tmp_path):
+    config = tmp_path / "obsidian.json"
+    config.write_text(json.dumps(CONFIG))
+    (tmp_path / "aaaa000000000001.json").write_text("{}")
+    (tmp_path / "aaaa000000000002.json").write_text("{}")
+
+    assert unregister_vault(config, "aaaa000000000001") is True
+
+    data = json.loads(config.read_text())
+    assert "aaaa000000000001" not in data["vaults"]
+    expected = json.loads(json.dumps(CONFIG))
+    del expected["vaults"]["aaaa000000000001"]
+    assert data == expected
+    assert json.loads((tmp_path / "obsidian.json.bak").read_text()) == CONFIG
+    assert not (tmp_path / "aaaa000000000001.json").exists()
+    assert (tmp_path / "aaaa000000000002.json").exists()
+
+
+def test_unregister_unknown_vault_changes_nothing(tmp_path):
+    config = tmp_path / "obsidian.json"
+    config.write_text(json.dumps(CONFIG))
+    before = config.read_text()
+    assert unregister_vault(config, "nope") is False
+    assert config.read_text() == before
+    assert not (tmp_path / "obsidian.json.bak").exists()
+
+
+def test_unregister_odd_id_does_not_delete_other_files(tmp_path):
+    sub = tmp_path / "obsidian"
+    sub.mkdir()
+    config = sub / "obsidian.json"
+    config.write_text(json.dumps({"vaults": {"../victim": {"path": "/x"}}}))
+    (tmp_path / "victim.json").write_text("keep")
+    assert unregister_vault(config, "../victim") is True
+    assert (tmp_path / "victim.json").read_text() == "keep"

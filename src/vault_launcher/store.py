@@ -3,7 +3,7 @@ import locale
 import logging
 import os
 import time
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
@@ -71,10 +71,11 @@ class SyncResult:
     added: list[Vault] = field(default_factory=list)
     updated: list[Vault] = field(default_factory=list)
     missing: list[Vault] = field(default_factory=list)
+    removed: list[Vault] = field(default_factory=list)
 
     @property
     def changed(self) -> bool:
-        return bool(self.added or self.updated)
+        return bool(self.added or self.updated or self.removed)
 
 
 def _collate(text: str) -> str:
@@ -93,8 +94,9 @@ def sort_vaults(vaults: Iterable[Vault], mode: str) -> list[Vault]:
 
 
 class VaultStore:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, folder_exists: Callable[[str], bool] = os.path.isdir):
         self.path = path
+        self._folder_exists = folder_exists
         self._vaults: dict[str, Vault] = {}
 
     @property
@@ -164,6 +166,10 @@ class VaultStore:
         if vault is not None:
             vault.hidden = True
 
+    def forget(self, key: str) -> None:
+        """Delete a vault from the launcher for good."""
+        self._vaults.pop(key, None)
+
     def unhide(self, key: str) -> None:
         self._vaults[key].hidden = False
 
@@ -179,6 +185,8 @@ class VaultStore:
 
         Vaults that disappeared from Obsidian are only reported in `missing`;
         the caller decides via resolve_missing() whether to keep or drop them.
+        Vaults that Obsidian does not list and whose folder is gone are dropped
+        right away and reported in `removed`.
         """
         result = SyncResult()
         seen_keys: set[str] = set()
@@ -217,7 +225,13 @@ class VaultStore:
             seen_keys.add(vault.key)
 
         for vault in self._vaults.values():
-            if not vault.in_obsidian or vault.key in seen_keys:
+            if vault.key in seen_keys:
+                continue
+            if not self._folder_exists(vault.path):
+                # Gone from Obsidian and from disk: nothing left to open or to ask about.
+                result.removed.append(vault)
+                continue
+            if not vault.in_obsidian:
                 continue
             if vault.hidden:
                 # Nothing to ask about: the user already hid it in the launcher.
@@ -225,6 +239,8 @@ class VaultStore:
                 result.updated.append(vault)
             else:
                 result.missing.append(vault)
+        for vault in result.removed:
+            del self._vaults[vault.key]
         return result
 
     def resolve_missing(self, keep: Iterable[str], remove: Iterable[str]) -> None:

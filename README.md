@@ -29,10 +29,12 @@ It is handy if you:
 
 - **Finds your vaults automatically.** It reads the vault list from Obsidian (regular,
   flatpak and snap installs) and stays in sync while it is open. If a vault disappears from
-  Obsidian, the launcher asks you whether to keep it or drop it.
+  Obsidian, the launcher asks you whether to keep it or drop it. If its folder is gone too,
+  the launcher simply drops it.
 - **Add any folder** as a vault, including folders Obsidian does not know yet.
 - **Your own labels.** Show "Work" instead of `company-kb-final`. The folder is not renamed.
 - **Hide** vaults you do not need in the list. You can restore them at any time in Settings.
+- **Remove a vault from Obsidian** right from the launcher. Your notes stay where they are.
 - **Sort** by last use, by folder name or by label.
 - **Looks like Obsidian.** It has a light, dark or "follow the system" theme.
 - **Closes after opening a vault**, or stays open if you prefer.
@@ -92,7 +94,7 @@ There is also an overlay, `inputs.vault-launcher.overlays.default`, which adds
 | | |
 |---|---|
 | **Double-click** or **Enter** | open the vault |
-| **Right-click** | menu: open, edit label, show folder in file manager, hide |
+| **Right-click** | menu: open, edit label, show folder in file manager, hide, remove from Obsidian |
 | **↑ / ↓**, **typing letters** | select a vault |
 | **F2** | edit the label |
 | **Delete** | hide the vault (restore it in Settings) |
@@ -104,7 +106,7 @@ Badges in the list:
 
 - **not in Obsidian**: Obsidian does not know this folder yet. See the next section.
 - **folder missing**: the folder no longer exists, for example because a drive is not
-  mounted.
+  mounted. Once Obsidian no longer lists the vault either, it disappears from the launcher.
 
 ### Folders Obsidian does not know yet
 
@@ -116,13 +118,22 @@ Obsidian reads the list only when it starts, so **Obsidian has to be closed** fo
 step. If it is running, the launcher asks you to close it and click Retry. After that, the
 vault opens normally, whether Obsidian is running or not.
 
+### Removing a vault from Obsidian
+
+Right-click a vault and choose **Remove from Obsidian…**. The vault disappears from Obsidian's
+list of vaults and from the launcher, just as if you removed it in Obsidian's vault manager.
+The folder and your notes are not touched, and you can add the folder again at any time.
+Obsidian has to be closed for this too.
+
 ## What it touches
 
 - **Your vaults:** only reads them. Obsidian creates its `.obsidian` folder in a new vault, as
   usual.
-- **Obsidian's settings:** only reads them, except when adding a folder Obsidian does not
-  know yet (see above). In that case it adds one entry to Obsidian's `obsidian.json` and keeps
-  the previous version as `obsidian.json.bak`.
+- **Obsidian's settings:** only reads them, except when you add a folder Obsidian does not
+  know yet or remove a vault from Obsidian (see above). Then it adds or removes one entry in
+  Obsidian's `obsidian.json`, plus that vault's window state file when removing, as Obsidian
+  does. It keeps the previous version as `obsidian.json.bak` and does this only while Obsidian
+  is closed.
 - **Its own data:** labels and hidden vaults are in
   `~/.local/share/vault-launcher/vaults.json`, settings in
   `~/.config/vault-launcher/settings.json`. For the flatpak, both are under
