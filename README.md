@@ -3,6 +3,8 @@
 Small launcher window for [Obsidian](https://obsidian.md) vaults: pick a vault, it opens in
 Obsidian, the launcher closes (or stays, if you prefer). Not affiliated with Obsidian.
 
+![Vault Launcher main window](data/screenshots/main.png)
+
 - Reads the vault list from Obsidian's `obsidian.json` (native, flatpak and snap installs) and
   keeps it in sync while the window is open. Vaults removed from Obsidian are not dropped
   silently, you decide whether to keep them.
@@ -21,13 +23,15 @@ Obsidian, the launcher closes (or stays, if you prefer). Not affiliated with Obs
 | Action | |
 |---|---|
 | Double-click, Enter | open the vault |
-| Right-click | menu: open, edit label, show folder, remove |
+| Right-click | menu: open, edit label, show folder, hide |
 | ↑ / ↓, typing letters | select a vault |
 | F2 | edit label |
-| Delete | remove from launcher (vaults known to Obsidian are only hidden) |
+| Delete | hide the vault (restore it in settings) |
 | Ctrl+O | add folder as vault |
 | Ctrl+, | settings and help |
 | Esc | close |
+
+![Settings with help](data/screenshots/settings.png)
 
 Data is stored in `~/.local/share/vault-launcher/vaults.json`, settings in
 `~/.config/vault-launcher/settings.json` (inside `~/.var/app/io.github.manihindrich.VaultLauncher/`
@@ -38,7 +42,7 @@ when running as a flatpak).
 ### Nix / NixOS
 
 ```sh
-nix run github:manihindrich/vault-launcher
+nix run github:manihindrich/VaultLauncher
 ```
 
 In a NixOS or home-manager configuration, add the flake as an input and use

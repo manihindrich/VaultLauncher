@@ -92,7 +92,7 @@ class MainWindow(QWidget):
         for key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             QShortcut(QKeySequence(key), self, self.open_selected)
         QShortcut(QKeySequence(Qt.Key.Key_F2), self, self.edit_label_selected)
-        QShortcut(QKeySequence(Qt.Key.Key_Delete), self, self.remove_selected)
+        QShortcut(QKeySequence(Qt.Key.Key_Delete), self, self.hide_selected)
         QShortcut(QKeySequence.StandardKey.Open, self, self.add_folder)
         QShortcut(QKeySequence("Ctrl+,"), self, self.show_settings)
 
@@ -400,24 +400,14 @@ class MainWindow(QWidget):
     def show_in_file_manager(self, vault: Vault) -> None:
         QDesktopServices.openUrl(QUrl.fromLocalFile(vault.path))
 
-    def remove_selected(self) -> None:
+    def hide_selected(self) -> None:
+        # No confirmation: hidden vaults can be restored in Settings.
         vault = self.selected_vault()
         if not vault:
             return
-        if vault.in_obsidian:
-            detail = self.tr("Obsidian still knows this vault, so it will only be hidden. "
-                             "You can restore it in Settings.")
-        else:
-            detail = self.tr("The folder itself is not touched.")
-        answer = QMessageBox.question(
-            self,
-            self.tr("Remove vault"),
-            self.tr("Remove “{}” from the launcher?").format(vault.display_name) + "\n\n" + detail,
-        )
-        if answer == QMessageBox.StandardButton.Yes:
-            self.store.remove(vault.key)
-            self._save_store()
-            self.refresh()
+        self.store.hide(vault.key)
+        self._save_store()
+        self.refresh()
 
     def _show_context_menu(self, pos: QPoint) -> None:
         index = self.list.indexAt(pos)
@@ -435,7 +425,7 @@ class MainWindow(QWidget):
                               lambda: self.show_in_file_manager(vault))
         show.setEnabled(os.path.isdir(vault.path))
         menu.addSeparator()
-        menu.addAction(self.tr("Remove from launcher…"), self.remove_selected)
+        menu.addAction(self.tr("Hide vault"), self.hide_selected)
         menu.exec(self.list.viewport().mapToGlobal(pos))
 
     def show_settings(self) -> None:

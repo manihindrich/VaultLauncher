@@ -44,7 +44,7 @@ python3Packages.buildPythonApplication {
 
   meta = {
     description = "Small launcher window for Obsidian vaults";
-    homepage = "https://github.com/manihindrich";
+    homepage = "https://github.com/manihindrich/VaultLauncher";
     license = lib.licenses.mit;
     mainProgram = "vault-launcher";
     platforms = lib.platforms.linux;

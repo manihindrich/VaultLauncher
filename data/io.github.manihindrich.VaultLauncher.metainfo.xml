@@ -31,7 +31,20 @@
     <binary>vault-launcher</binary>
   </provides>
 
-  <url type="homepage">https://github.com/manihindrich</url>
+  <url type="homepage">https://github.com/manihindrich/VaultLauncher</url>
+  <url type="bugtracker">https://github.com/manihindrich/VaultLauncher/issues</url>
+  <url type="vcs-browser">https://github.com/manihindrich/VaultLauncher</url>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Pick a vault and open it in Obsidian</caption>
+      <image>https://raw.githubusercontent.com/manihindrich/VaultLauncher/v0.1.0/data/screenshots/main.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Settings with a short help</caption>
+      <image>https://raw.githubusercontent.com/manihindrich/VaultLauncher/v0.1.0/data/screenshots/settings.png</image>
+    </screenshot>
+  </screenshots>
 
   <content_rating type="oars-1.1"/>
 

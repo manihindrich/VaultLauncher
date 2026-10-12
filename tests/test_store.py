@@ -138,16 +138,16 @@ def test_sorting():
     assert [v.key for v in sort_vaults([a, b, c], SORT_LABEL)] == ["c", "b", "a"]
 
 
-def test_remove_hides_obsidian_vault_and_deletes_manual(tmp_path):
+def test_hide_obsidian_and_manual_vaults(tmp_path):
     store = make_store(tmp_path)
     store.sync([ObsidianVault("id1", "/v/a")])
     manual = store.add_manual("/v/m")
 
-    store.remove("id1")
-    store.remove(manual.key)
-    assert store.get(manual.key) is None
-    assert store.get("id1").hidden
-    assert store.visible_vaults == [] and [v.key for v in store.hidden_vaults] == ["id1"]
+    store.hide("id1")
+    store.hide(manual.key)
+    assert store.get("id1").hidden and store.get(manual.key).hidden
+    assert store.visible_vaults == []
+    assert sorted(v.key for v in store.hidden_vaults) == sorted(["id1", manual.key])
 
     # Hidden vault stays hidden after sync and is not reported as new.
     result = store.sync([ObsidianVault("id1", "/v/a")])
@@ -160,7 +160,7 @@ def test_remove_hides_obsidian_vault_and_deletes_manual(tmp_path):
 def test_hidden_vault_disappearing_from_obsidian_is_not_reported(tmp_path):
     store = make_store(tmp_path)
     store.sync([ObsidianVault("id1", "/v/a")])
-    store.remove("id1")
+    store.hide("id1")
     result = store.sync([])
     assert result.missing == []
     assert store.get("id1").in_obsidian is False
@@ -169,6 +169,6 @@ def test_hidden_vault_disappearing_from_obsidian_is_not_reported(tmp_path):
 def test_adding_hidden_path_manually_unhides_it(tmp_path):
     store = make_store(tmp_path)
     store.sync([ObsidianVault("id1", "/v/a")])
-    store.remove("id1")
+    store.hide("id1")
     assert store.add_manual("/v/a") is store.get("id1")
     assert not store.get("id1").hidden

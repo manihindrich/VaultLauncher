@@ -96,8 +96,8 @@ class SettingsDialog(QDialog):
         layout.addLayout(shortcuts)
         layout.addSpacing(4)
         badges = QLabel(
-            self.tr("<b>not in Obsidian</b> – the vault is opened by its folder path and "
-                    "Obsidian adds it to its own vault list.<br><b>folder missing</b> – the "
+            self.tr("<b>not in Obsidian</b> – opening it adds the folder to Obsidian's vault "
+                    "list; Obsidian has to be closed for that.<br><b>folder missing</b> – the "
                     "folder does not exist anymore."),
             objectName="help",
             wordWrap=True,
@@ -130,12 +130,12 @@ class SettingsDialog(QDialog):
     def _shortcuts(self) -> list[tuple[str, str]]:
         return [
             (self.tr("Double-click"), self.tr("Open the vault")),
-            (self.tr("Right-click"), self.tr("Menu: open, label, show folder, remove")),
+            (self.tr("Right-click"), self.tr("Menu: open, label, show folder, hide")),
             ("↑ / ↓", self.tr("Select a vault")),
             (self.tr("Type letters"), self.tr("Jump to a vault by its name or label")),
             ("Enter", self.tr("Open the selected vault")),
             ("F2", self.tr("Edit label")),
-            ("Delete", self.tr("Remove from launcher")),
+            ("Delete", self.tr("Hide vault (restore it here)")),
             ("Ctrl+O", self.tr("Add folder as vault")),
             ("Ctrl+,", self.tr("Settings and help")),
             ("Esc", self.tr("Close the window")),

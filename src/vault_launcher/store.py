@@ -155,19 +155,14 @@ class VaultStore:
         self._vaults[vault.key] = vault
         return vault
 
-    def remove(self, key: str) -> None:
-        """Remove a vault from the launcher.
+    def hide(self, key: str) -> None:
+        """Hide a vault in the launcher; it can be restored in Settings.
 
-        Vaults Obsidian knows about are only hidden, otherwise the next sync
-        would bring them back.
+        Hiding instead of deleting also keeps a sync from bringing the vault back.
         """
         vault = self._vaults.get(key)
-        if vault is None:
-            return
-        if vault.in_obsidian:
+        if vault is not None:
             vault.hidden = True
-        else:
-            del self._vaults[key]
 
     def unhide(self, key: str) -> None:
         self._vaults[key].hidden = False
@@ -225,7 +220,7 @@ class VaultStore:
             if not vault.in_obsidian or vault.key in seen_keys:
                 continue
             if vault.hidden:
-                # Nothing to ask about: the user already removed it from the launcher.
+                # Nothing to ask about: the user already hid it in the launcher.
                 vault.in_obsidian = False
                 result.updated.append(vault)
             else:
